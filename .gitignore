@@ -1,0 +1,89 @@
+# Python virtual environments
+venv/
+env/
+.venv/
+.env/
+ENV/
+env.bak/
+venv.bak/
+
+# Python cache and compiled files
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints
+
+# Pytest cache
+.pytest_cache/
+
+# VS Code settings
+.vscode/
+
+# macOS files
+.DS_Store
+
+# IDEs and editors
+.idea/
+*.sublime-workspace
+*.sublime-project
+
+# Environments and secrets
+.env
+.env.*
+
+# Coverage reports
+htmlcov/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+
+# Mypy
+.mypy_cache/
+.dmypy.json
+
+# Build
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# pip wheel package
+*.whl
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / test output
+test-output/
+.tox/
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+
+# Docker files
+docker-compose.override.yml
+
+# SQLite database
+*.sqlite3
+
+# Node.js (if using JS frontend)
+node_modules/
+
+# Logs
+*.log
+
+# Local config
+local_settings.py
+
+# Large files 
+ingestion/output/articles_final.json
