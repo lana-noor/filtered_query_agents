@@ -34,7 +34,8 @@ It demonstrates agentic RAG patterns where user queries are routed and transform
 ## Ingestion Folder & Data Prep
 
 ### How to Process an Excel File and Ingest to Azure AI Search
-This repo uses the `ingestion/Push_Ingestion_Notebook_ArticlesData.ipynb` notebook to ingest data to Azure AI Search using the Push API: 
+The data in the index was taken from [Kaggle Medium Articles Data](https://www.kaggle.com/datasets/shlokramteke/sdfadgdadfda). The dataset includes the following columns: id, url, title, subtitle, claps, responses, reading_time, publication, date. 
+This repo uses the `ingestion/Push_Ingestion_Notebook_ArticlesData.ipynb` notebook to ingest this data to Azure AI Search using the Push API: 
 
 1. **Convert Excel to CSV**  
    Place your CSV in the `ingestion/` folder.
@@ -61,10 +62,11 @@ The following steps are taken for preprocessing excel file:
 - Your index schema must match your JSON data exactly (same field names and types)
   - Why: This ensures ingestion will not fail and all filters, sorts, and search features work as expected.
 
-6.  **Upload with Push API**  
-   The repo uses the [Push API](https://learn.microsoft.com/en-us/azure/search/search-howto-upload-data-push-api) via the `azure-search-documents` Python SDK. Batch processing of JSON documents is pushed to index using `SearchIndexingBufferedSender` from `azure.search.documents`. 
+6.  **Upload with Push API**
+- The repo uses the [Push API](https://learn.microsoft.com/en-us/azure/search/search-what-is-data-import) via the `azure-search-documents` Python SDK.
+- Batch processing of JSON documents is pushed to index using `SearchIndexingBufferedSender` from `azure.search.documents`. 
 
-7. **Test Index with Full Text Search**
+9. **Test Index with Full Text Search**
 - Full text search allows users to search the content of text fields (such as title, content, subtitle, etc.) for relevant documents based on keywords or natural language queries.
 - The search engine analyzes, tokenizes, and indexes all words in the text fields so you can retrieve results that "contain," "match," or are "similar to" your query, regardless of exact phrasing or word order.
 - Filtering uses structured (OData-based) queries to return only documents where fields meet specific conditions, similar to SQL WHERE clauses.
@@ -83,52 +85,58 @@ filter_query = "search.ismatch('Google', 'title') and reading_time gt 5"
 `
 
 ## Architectures Breakdown
+You can deploy either a Single Agent Filtered Query system or a Multi-Agent system with a dedicated agent for filtered queries.
+The repo provides different agent workflows, allowing you to choose the right approach for your use case. 
+- Use app_single_agent.py to run the single filtered query agent architecture.
+- Use app_multi_agent.py for the multi-agent workflow, which routes queries to a specialized filtered query agent when needed.
 
 ### 1. Single Agent – Filtered Query Agent
+<img width="5225" height="1907" alt="Single Agent Filtered Query REPO" src="https://github.com/user-attachments/assets/eefe4e37-85f3-4738-b003-b19691b0c5f1" />
 
 - **1 agent:** Filtered Query Agent (`ChatCompletionsAgent`)
-- **1 plugin:** `ai_search_keyword` (full text/keyword search with filters)
+- **1 plugin:** `ai_search_both` (full text/keyword with filters and hybrid/ semantic search)
 - **Flow:**  
-  User query → Filtered Query Agent → JSON filtered query → ai_search_keyword plugin → Azure AI Search
+  User query → Filtered Query Agent → JSON filtered query → ai_search_both plugin → Azure AI Search
 
 **When to use:**  
-When you need to convert NL queries directly into filtered search (e.g., “claps > 1000, date after X”).
+Use this approach when you need to convert natural language (NL) queries directly into filtered search (e.g., “claps > 1000, date after X”), and when you expect most users to ask questions that combine both hybrid search and filtering. This workflow is ideal when queries are typically a mix of semantic relevance and structured filters, rather than being exclusively one or the other.
 
 ---
 
-### 2. Router + Filtered Query Agent (Multi-Agent)
+### 2. Main Search Agent + Filtered Query Agent (Multi-Agent)
+<img width="6292" height="2520" alt="Multi Agent Filtered Query REPO" src="https://github.com/user-attachments/assets/81cde4de-a7c9-4096-b510-30a79791fb32" />
 
 - **2 agents:**
-  - Router Agent (`ChatCompletionsAgent`): routes the user query based on intent (filter vs. semantic)
-  - Filtered Query Agent (`ChatCompletionsAgent`): handles conversion to filtered queries if needed
-- **1 plugin:** `ai_search_keyword`
+  - Main Search Agent (`ChatCompletionsAgent`): routes the user query based to the filtered query agent if query has filter or if it not not include a filter, agent invokes the hybrid search plugin (filter vs. semantic)
+      - **2 plugin:**
+          - `ai_search_hybrid` (only hybrid/ semantic ranker search (retireves top 5 documents)
+          -  `filtered_query_agent` (agent plugin)
+  - Filtered Query Agent (`ChatCompletionsAgent`): handles conversion to filtered queries and invokes  `ai_search_both` plugin.
+      - **1 plugin:** `ai_search_both` (full text/keyword with filters and hybrid/ semantic search)
 - **Flow:**  
-  User query → Router Agent → (Filtered Query Agent, if filter intent detected) → ai_search_keyword plugin → Azure AI Search
-
+  User query → Main Search Agent → (Filtered Query Agent, if filter intent detected) → Filtered Query Agent → JSON filtered query → ai_search_both plugin → Azure AI Search
+  User query → Main Search Agent → (no filtered query detected) → ai_search_hybrid plugin → Azure AI Search
+  
 **When to use:**  
-For mixed queries, where the system must decide:
-- Use filtered search for queries with explicit filters
-- Use semantic/hybrid otherwise
-
+For mixed queries, where the system must decide dynamically how to search:
+- Use filtered search for queries with explicit filters, such as date ranges, minimum claps, or specific publications (e.g., “articles from 2023 with more than 100 responses”).
+- Use semantic or hybrid search otherwise, for open-ended or relevance-based questions (e.g., “What are the best productivity tips?”).
+- Ideal when user queries are unpredictable and may contain a mix of structured and unstructured requirements.
+- Enables a seamless user experience, letting the agent route queries intelligently without user intervention.
 ---
 
-### 3. Full Multi-Agent: Router, Filtered, Hybrid Agents
+## Testing Plugins: `ai_search_both` and `ai_search_hybrid`
+The repo includes two test folders designed to demonstrate and validate the behavior of different Azure AI Search plugin strategies:
+1. ai_search_both Plugin:
+- Enables hybrid search, combining full-text/keyword search with vector-based semantic search in a single query. Use this to evaluate how well the system retrieves results when both classic and vector retrieval are combined.
+2. ai_search_hybrid Plugin:
+- Focuses on pure hybrid or semantic search, leveraging Azure AI Search’s vector and semantic ranking capabilities. Use this to test scenarios where deep semantic understanding or vector similarity is prioritized.
 
-- **3 agents:**
-  - Router Agent: Detects if query is filterable or semantic/hybrid
-  - Filtered Query Agent: For structured/filtered queries
-  - Hybrid Query Agent: For unstructured, hybrid, or semantic queries (uses `ai_search_hybrid` plugin)
-- **2 plugins:**
-  - `ai_search_keyword`: for full-text keyword/filter search
-  - `ai_search_hybrid`: for hybrid+semantic vector search
-- **Flow:**  
-  User query → Router Agent → (Filtered Query Agent or Hybrid Query Agent) → respective plugin → Azure AI Search
-
-**When to use:**  
-You want maximum flexibility for both natural and structured queries, and to combine LLM-powered hybrid search with classic filters.
+### Test Folder:
+- Each test folder contains example scripts and data to help you quickly verify that the corresponding plugin is functioning correctly and returning expected search results.
+- Run these tests to compare the output, understand the strengths of each approach, and ensure your deployment is configured for your specific retrieval needs.
 
 ---
-
 ## How to Deploy
 
 ### 1. Clone the Repo
@@ -136,4 +144,33 @@ You want maximum flexibility for both natural and structured queries, and to com
 ```bash
 git clone https://github.com/lana-noor/filtered_query_agents.git
 cd filtered_query_agents
+```
+
+### 2.  Configure Environment Variables
+Set your Azure Search, OpenAI, and any Cosmos DB credentials in a .env file or as environment variables.
+
+### 3. Ingest Data 
+Upload your data to the data folder and use the notebook to ingest data to Azure AI Search Index 
+
+### 4. Create a Virtual Environment and Install Requirements
+```bash
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install -r requirements.txt
+```
+### 5. Test Plugins 
+```bash
+python test_ai_search_both.py
+python test_ai_search_hybrid.py
+```
+
+### 6. Run the App 
+Interact with the application conversational AI using the CLI (no frontend integrated) 
+```bash
+python app_single_agent.py
+python app_multi_agent.py
+```
+
+
+
 
