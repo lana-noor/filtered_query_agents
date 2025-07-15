@@ -125,7 +125,7 @@ For mixed queries, where the system must decide dynamically how to search:
 - Enables a seamless user experience, letting the agent route queries intelligently without user intervention.
 
 ### 3. Router Agent + Filtered Query Agent + Hybrid Search Agent (Multi-Agent)
-<img width="6292" height="2520" alt="Multi Agent Filtered Query REPO" src="https://github.com/user-attachments/assets/74a02ee3-a470-4dd4-a195-b41fa6a232ee" />
+<img width="6367" height="2106" alt="Router Agent Multi Agent Filtered Query REPO" src="https://github.com/user-attachments/assets/84608bd3-0147-4935-bcdf-e974bbbd396e" />
 
 - **3 agents:**
   - **Router Agent (`ChatCompletionsAgent`):**
