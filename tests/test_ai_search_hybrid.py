@@ -4,7 +4,7 @@ import os
 # Add plugins directory to Python path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../plugins')))
 
-from ai_search_hybrid_filtered import AiSearchHybrid
+from ai_search_hybrid import AiSearchHybrid
 
 def main():
     print("=== Azure AI Search Filtered Query Tester (No Hybrid/Semantic) ===")
