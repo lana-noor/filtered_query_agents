@@ -91,7 +91,7 @@ The repo provides different agent workflows, allowing you to choose the right ap
 - Use app_multi_agent.py for the multi-agent workflow, which routes queries to a specialized filtered query agent when needed.
 
 ### 1. Single Agent – Filtered Query Agent
-<img width="5225" height="1907" alt="Single Agent Filtered Query REPO" src="https://github.com/user-attachments/assets/eefe4e37-85f3-4738-b003-b19691b0c5f1" />
+<img width="5225" height="1907" alt="Single Agent Filtered Query REPO" src="https://github.com/user-attachments/assets/e06f968c-6a8b-4a30-9176-8e482b41a97c" />
 
 - **1 agent:** Filtered Query Agent (`ChatCompletionsAgent`)
 - **1 plugin:** `ai_search_both` (full text/keyword with filters and hybrid/ semantic search)
@@ -104,7 +104,7 @@ Use this approach when you need to convert natural language (NL) queries directl
 ---
 
 ### 2. Main Search Agent + Filtered Query Agent (Multi-Agent)
-<img width="6292" height="2520" alt="Multi Agent Filtered Query REPO" src="https://github.com/user-attachments/assets/81cde4de-a7c9-4096-b510-30a79791fb32" />
+<img width="6292" height="2520" alt="Multi Agent Filtered Query REPO" src="https://github.com/user-attachments/assets/74a02ee3-a470-4dd4-a195-b41fa6a232ee" />
 
 - **2 agents:**
   - Main Search Agent (`ChatCompletionsAgent`): routes the user query based to the filtered query agent if query has filter or if it not not include a filter, agent invokes the hybrid search plugin (filter vs. semantic)
