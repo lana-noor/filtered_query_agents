@@ -107,10 +107,10 @@ Use this approach when you need to convert natural language (NL) queries directl
 <img width="6292" height="2520" alt="Multi Agent Filtered Query REPO" src="https://github.com/user-attachments/assets/74a02ee3-a470-4dd4-a195-b41fa6a232ee" />
 
 - **2 agents:**
-  - Main Search Agent (`ChatCompletionsAgent`): routes the user query based to the filtered query agent if query has filter or if it not not include a filter, agent invokes the hybrid search plugin (filter vs. semantic)
+  - Main Search Agent (`ChatCompletionsAgent`): routes the user query to the filtered query agent if query has filter or if it not not include a filter, agent invokes the hybrid search plugin (filter vs. semantic)
       - **2 plugin:**
-          - `ai_search_hybrid` (only hybrid/ semantic ranker search (retireves top 5 documents)
-          -  `filtered_query_agent` (agent plugin)
+          - `hybrid_search_agent`: agent plugin for hybrid search
+          - `filtered_query_agent`: agent plugin for filtering with hybrid search
   - Filtered Query Agent (`ChatCompletionsAgent`): handles conversion to filtered queries and invokes  `ai_search_both` plugin.
       - **1 plugin:** `ai_search_both` (full text/keyword with filters and hybrid/ semantic search)
 - **Flow:**  
@@ -123,13 +123,93 @@ For mixed queries, where the system must decide dynamically how to search:
 - Use semantic or hybrid search otherwise, for open-ended or relevance-based questions (e.g., “What are the best productivity tips?”).
 - Ideal when user queries are unpredictable and may contain a mix of structured and unstructured requirements.
 - Enables a seamless user experience, letting the agent route queries intelligently without user intervention.
+
+### 3. Router Agent + Filtered Query Agent + Hybrid Search Agent (Multi-Agent)
+<img width="6292" height="2520" alt="Multi Agent Filtered Query REPO" src="https://github.com/user-attachments/assets/74a02ee3-a470-4dd4-a195-b41fa6a232ee" />
+
+- **3 agents:**
+  - **Router Agent (`ChatCompletionsAgent`):**
+    - Examines each user query and routes it based on intent:
+      - If a filter (e.g., date range, minimum claps) is detected, routes to the Filtered Query Agent.
+      - If no filter is present, routes to the Hybrid Search Agent.
+    - **2 plugins:**
+      - `hybrid_search_agent`: agent plugin for hybrid search
+      - `filtered_query_agent`: agent plugin for filtering with hybrid search
+  - **Filtered Query Agent (`ChatCompletionsAgent`):**
+    - Converts natural language queries into explicit filtered queries, then invokes `ai_search_both` for hybrid + filtered search.
+    - **1 plugin:** `ai_search_both`
+  - **Hybrid Search Agent (`ChatCompletionsAgent`):**
+    - Handles semantic/hybrid search queries that do not require filtering, invoking `ai_search_hybrid`.
+    - **1 plugin:** `ai_search_hybrid`
+
+- **Flow:**  
+  - **Filtered query intent:**  
+    User query → Router Agent → Filtered Query Agent → JSON filtered query → `ai_search_both` plugin → Azure AI Search
+  - **No filter intent:**  
+    User query → Router Agent → Hybrid Search Agent → `ai_search_hybrid` plugin → Azure AI Search
+
+**When to use:**
+For complex queries where an LLM is needed to determine whether a filter is present and how it should be applied:
+- Use this architecture when user questions are **unpredictable and may combine natural language, full text, and structured filtering**—for example, “Show me articles about AI from 2023 with more than 1,000 claps, sorted by responses.”
+- Ideal for scenarios where the **data model is rich and contains many filterable fields** (e.g., date ranges, authors, categories, response counts, etc.), and you want your system to intelligently parse and apply these filters based on user intent.
+- Perfect if users are likely to ask both open-ended (“What are the latest trends in data science?”) and highly structured (“List productivity articles from UX Collective published after May 2022 with at least 10 responses.”) questions.
+- This approach leverages the Router Agent to let an LLM decide the best search strategy for each query:
+    - **If the query includes a filter,** it is routed to the Filtered Query Agent, which constructs and executes an advanced filter query using `ai_search_both`.
+    - **If no filter is detected,** the query is routed to the Hybrid Search Agent, which runs semantic/hybrid search via `ai_search_hybrid`.
+- Recommended when you need to **combine flexible LLM-powered search with strict business constraints** (like regulatory reporting, compliance, or tailored insights) where sometimes a semantic result is best, and other times exact field matching is required.
+- **Also useful when you need specialized post-processing on hybrid search results**—for example, if the Hybrid Search Agent is programmed to summarize, generate insights, or trigger automated actions based on retrieved content.
+
 ---
 
-## Testing Plugins: `ai_search_both` and `ai_search_hybrid`
+##  Plugins: `ai_search_both` and `ai_search_hybrid`
+
+### `ai_search_both` Plugin
+
+The `ai_search_both` plugin implements a two-step **hybrid + filtered search** on your Azure AI Search index:
+
+1. **Hybrid Search:**  
+   - Uses both vector search (on `titlesVector` and `contentVector`) and full-text/semantic search.
+   - Retrieves the top 50 most relevant documents for the given query, leveraging Azure AI Search’s hybrid and semantic capabilities.
+
+2. **Filtered Re-Ranking:**  
+   - Optionally applies a structured filter (e.g., by date, claps, publication) to the top 50 results from step 1.
+   - This filter can handle advanced conditions like `responses > 10 and publication eq 'UX Collective'`.
+   - Returns only the top 5 documents matching both semantic/hybrid relevance and your structured filter.
+
+**How it works:**  
+- The plugin first performs a broad hybrid search to capture the most semantically relevant candidates.
+- It then narrows the results down using classic structured filtering (like a SQL WHERE clause) — but only among those top candidates, combining the strengths of both approaches.
+
+**Use case:**  
+> Perfect when you want the flexibility of semantic search but still need to enforce strict filters, such as date ranges, authors, or numerical thresholds.
+
+**Example usage:**  
+- "Show me articles about Microsoft published after 2021 with more than 500 claps."
+- The plugin finds the most relevant articles, then applies the filters to those results, ensuring both relevance and precision.
+
+### `ai_search_hybrid` Plugin
+
+The `ai_search_hybrid` plugin performs a **pure hybrid and semantic search** on your Azure AI Search index.
+
+- **How it works:**
+  - Runs a hybrid query that combines vector similarity (using both `titlesVector` and `contentVector`) with full-text and semantic search across `title`, `subtitle`, and `content` fields.
+  - Retrieves the top results (default: top 5) that are most relevant to the user’s query—*without applying any structured filters or field constraints*.
+  - Returns a concise summary for each result, combining title, subtitle, and content for context.
+
+- **Use case:**  
+  > Ideal when you want the highest relevance from both semantic (vector) and keyword search, and you don’t need to filter by metadata such as date, claps, or author.
+
+- **Example usage:**  
+  - "Find articles about boosting productivity with sleep science."
+  - "What are the best tips for learning Python quickly?"
+
+This plugin is optimized for open-ended, natural language queries where semantic context and keyword matching are both important, but no additional field-based filtering is required.
+
+## Testing Plugins: 
 The repo includes two test folders designed to demonstrate and validate the behavior of different Azure AI Search plugin strategies:
-1. ai_search_both Plugin:
+1. test_ai_search_both:
 - Enables hybrid search, combining full-text/keyword search with vector-based semantic search in a single query. Use this to evaluate how well the system retrieves results when both classic and vector retrieval are combined.
-2. ai_search_hybrid Plugin:
+2. test_ai_search_hybrid:
 - Focuses on pure hybrid or semantic search, leveraging Azure AI Search’s vector and semantic ranking capabilities. Use this to test scenarios where deep semantic understanding or vector similarity is prioritized.
 
 ### Test Folder:
@@ -168,7 +248,8 @@ python test_ai_search_hybrid.py
 Interact with the application conversational AI using the CLI (no frontend integrated) 
 ```bash
 python app_single_agent.py
-python app_multi_agent.py
+python app_multi_agent_2agents.py
+python app_multi_agent_3agents.py
 ```
 
 
